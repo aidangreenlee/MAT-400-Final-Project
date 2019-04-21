@@ -3,6 +3,12 @@
 ```{r}
 library(tidyverse)
 require(gridExtra)
+library(tidymodels)
+library(dplyr)
+```
+
+
+```{r}
 data <- read.csv(file = "shot_logs.csv")
 unique <- unique(data$player_name)
 filter(data, player_name == "brian roberts")
@@ -10,3 +16,26 @@ plot1 <- ggplot(data,mapping = aes(x=SHOT_DIST,y=CLOSE_DEF_DIST,color = SHOT_RES
 plot2 <- ggplot(data,mapping = aes(x=SHOT_DIST,y=CLOSE_DEF_DIST,color = PTS_TYPE)) + geom_point()
 grid.arrange(plot1, plot2, ncol=2)
 ```
+
+```{r}
+resample <- initial_split(prop = .7, data)
+test <- testing(resample)
+train <- training(resample)
+```
+
+```{r}
+ggplot(train) + geom_point(aes(x = SHOT_DIST, y = CLOSE_DEF_DIST, color = PTS_TYPE))
+ggplot(train) + geom_point(aes(x = SHOT_DIST, y = CLOSE_DEF_DIST, color = SHOT_RESULT))
+```
+```{r}
+train %>% mutate(SHOT_RESULT = ifelse(SHOT_RESULT == "made", 1, 0))
+```
+
+```{r}
+lmfit <- lm(SHOT_RESULT ~ CLOSE_DEF_DIST, train)
+```
+```{r}
+lmfit
+```
+
+
