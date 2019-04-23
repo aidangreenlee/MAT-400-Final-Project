@@ -8,5 +8,5 @@ unique <- unique(data$player_name)
 filter(data, player_name == "brian roberts")
 plot1 <- ggplot(data,mapping = aes(x=SHOT_DIST,y=CLOSE_DEF_DIST,color = SHOT_RESULT)) + geom_point()
 plot2 <- ggplot(data,mapping = aes(x=SHOT_DIST,y=CLOSE_DEF_DIST,color = PTS_TYPE)) + geom_point()
-grid.arrange(plot1, plot2, ncol=2)
+grid.arrange(plot1, plot2)
 ```
