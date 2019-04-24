@@ -81,6 +81,13 @@ arrange(vars, desc((vars$s0)^2))
 enet <- glmnet(x, y, alpha = alpha)
 plot(enet, xvar= "lambda")
 ```
+```{r}
+elasticnet
+enetpred <- as_tibble(predict(elasticnet, newx=model.matrix(SHOT_RESULT ~ ., data = test)))
+enetpred
+enetpred <- enetpred %>% mutate(s0 = ifelse(s0 >= .5, 1, 0))
+enetpred
+```
 
 
 ```{r fit, echo=FALSE}
