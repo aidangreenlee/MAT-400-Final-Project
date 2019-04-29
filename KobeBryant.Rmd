@@ -1,0 +1,143 @@
+---
+title: "Final Project"
+subtitle: NBA data
+author: Aidan and Liam Greenlee
+output:
+  slidy_presentation: default
+  beamer_presentation: default
+---
+
+## R Markdown
+
+```{r markdown, include=FALSE}
+library(tidyverse)
+require(gridExtra)
+library(tidymodels)
+library(dplyr)
+library(e1071)
+library(modelr)
+library(caret)
+library(lubridate)
+library(tree)
+```
+
+## Preparing Data
+```{r prep, echo=FALSE}
+data <- na.omit(read.csv(file = "data.csv"))
+unique(data$shot_type)
+data <- mutate(data,time_remaining = 60*minutes_remaining + seconds_remaining)
+ggplot(data, aes(x=shot_distance, y = time_remaining,color=shot_made_flag))+geom_point()
+ggplot(data, aes(x=combined_shot_type,y = shot_made_flag)) + geom_jitter()
+```
+
+
+
+## Splitting Data
+```{r split, results='hide'}
+resample <- initial_split(prop = .7, data)
+test <- testing(resample)
+train <- training(resample)
+split <- resample_partition(train, c(train1 = .1, train2 = .9))
+train1 <- as_tibble(split$train1)
+train2 <- as_tibble(split$train2)
+train1
+```
+## Graph
+```{r graph, echo=FALSE}
+plot(x = train1$GAME_CLOCK, y = train1$PERIOD)
+```
+
+## Fit Data
+```{r fit, echo=FALSE}
+svmfit <- svm(SHOT_RESULT ~ LOCATION + W + FINAL_MARGIN + SHOT_NUMBER + PERIOD + GAME_CLOCK + SHOT_CLOCK + DRIBBLES + TOUCH_TIME + SHOT_DIST + PTS_TYPE + CLOSEST_DEFENDER_PLAYER_ID + CLOSE_DEF_DIST + player_id + GAME_ID, data = train1, kernel = "radial", cost = 10, gamma = 1)
+
+lmfit <- lm( data = train1, SHOT_RESULT ~ LOCATION + W + FINAL_MARGIN + SHOT_NUMBER + PERIOD + GAME_CLOCK + SHOT_CLOCK + DRIBBLES + TOUCH_TIME + SHOT_DIST + PTS_TYPE + CLOSEST_DEFENDER_PLAYER_ID + CLOSE_DEF_DIST + player_id + GAME_ID)
+
+treefit <- tree( data = train1, formula = SHOT_RESULT ~ LOCATION + W + FINAL_MARGIN + SHOT_NUMBER + PERIOD + GAME_CLOCK + SHOT_CLOCK + DRIBBLES + TOUCH_TIME + SHOT_DIST + PTS_TYPE + CLOSEST_DEFENDER_PLAYER_ID + CLOSE_DEF_DIST + player_id + GAME_ID)
+cvtree <- cv.tree(treefit, FUN = prune.tree, K = 10)
+```
+
+```{r}
+svmfit
+test$svmfit <- predict(svmfit, test)
+test$lmfit <- predict(lmfit, test)
+cvtree
+```
+## MSEs and Predictions
+```{r mse, echo=FALSE}
+library(caret)
+varImp(lmfit)
+treefit
+plot(treefit)
+text(treefit, pretty = 1, all = TRUE)
+test$treefit <- predict(treefit, test)
+test <- test %>% mutate(treefit = ifelse(treefit >= .5, 1, 0))
+test <- test %>% mutate(lmfit = ifelse(lmfit >= .5, 1, 0))
+test <- test %>% mutate(svmfit = ifelse(svmfit >= .5, 1, 0))
+cat("after\n")
+mean((test$treefit - test$SHOT_RESULT)^2)
+mean((test$lmfit - test$SHOT_RESULT)^2)
+mean((test$svmfit - test$SHOT_RESULT)^2)
+```
+## LOGISTIC REGRESSION
+```{r}
+glm_fit <- glm(SHOT_RESULT ~ .,
+    data = train,
+    family = binomial
+)
+glm_fit
+```
+
+```{r}
+test %>% add_predictions(glm_fit) %>% mutate(prob = exp(pred)/ (1 + exp(pred)))
+
+train <- train %>% 
+    add_predictions(glm_fit) %>% 
+    mutate(prob = exp(pred)/ (1 + exp(pred)), EstResult = ifelse(prob > 1 - priorProbability, 1, 0))
+
+autoplot(roc_curve(train, as.factor(SHOT_RESULT), prob))
+roc_auc(train, as.factor(SHOT_RESULT), prob)
+mse(glm_fit,test)
+```
+```{r}
+cutoff <- 1-priorProbability
+test2 <- add_predictions(test,glm_fit,var="pred")
+test2$prob = exp(test2$pred)/ (1 + exp(test2$pred))
+
+test2 <- test2 %>% mutate(estimate = ifelse(prob> cutoff, 1, 0)) %>% mutate(correct = ifelse(SHOT_RESULT == estimate,1,0))
+
+(1-(sum(test2$correct)/nrow(test2)))
+```
+
+
+
+
+```{r}
+data <- read.csv(file = "shot_logs.csv")
+unique <- unique(data$player_name)
+filter(data, player_name == "brian roberts")
+plot1 <- ggplot(data,mapping = aes(x=SHOT_DIST,y=CLOSE_DEF_DIST,color = SHOT_RESULT)) + geom_point()
+plot2 <- ggplot(data,mapping = aes(x=SHOT_DIST,y=CLOSE_DEF_DIST,color = PTS_TYPE)) + geom_point()
+grid.arrange(plot1, plot2, ncol=2)
+```
+
+```{r}
+resample <- initial_split(prop = .7, data)
+test <- testing(resample)
+train <- training(resample)
+```
+
+```{r}
+ggplot(train) + geom_point(aes(x = SHOT_DIST, y = CLOSE_DEF_DIST, color = PTS_TYPE))
+ggplot(train) + geom_point(aes(x = SHOT_DIST, y = CLOSE_DEF_DIST, color = SHOT_RESULT))
+```
+```{r}
+train %>% mutate(SHOT_RESULT = ifelse(SHOT_RESULT == "made", 1, 0))
+```
+
+```{r}
+lmfit <- lm(SHOT_RESULT ~ CLOSE_DEF_DIST, train)
+```
+```{r}
+lmfit
+```
