@@ -1,0 +1,61 @@
+---
+title: "Final Project"
+subtitle: NBA data
+author: Aidan and Liam Greenlee
+output:
+  slidy_presentation: default
+  beamer_presentation: default
+---
+
+## R Markdown
+
+```{r markdown, include=FALSE}
+library(tidyverse)
+require(gridExtra)
+library(tidymodels)
+library(dplyr)
+library(e1071)
+library(modelr)
+library(caret)
+library(lubridate)
+library(tree)
+```
+
+## Preparing Data
+```{r prep, echo=FALSE}
+data <- na.omit(read.csv(file = "data.csv"))
+unique(data$shot_type)
+data <- mutate(data,time_remaining = 60*minutes_remaining + seconds_remaining)
+ggplot(data, aes(x=shot_distance, y = time_remaining,color=shot_made_flag))+geom_point()
+ggplot(data, aes(x=combined_shot_type,y = shot_made_flag)) + geom_jitter()
+```
+
+
+
+## Splitting Data
+```{r split, results='hide'}
+
+#data$shot_made_flag <- as.factor(data$shot_made_flag)
+dataUsed <- data[,c(2,9,10,15,16,17,18,24,25)]
+resample <- initial_split(prop = .7, dataUsed)
+test <- testing(resample)
+train <- training(resample)
+```
+
+```{r}
+library(xgboost)
+
+priorProbability <- sum(data$shot_made_flag)/nrow(data)
+
+m <- model.matrix(shot_made_flag~., data = train)
+m2 <- model.matrix(shot_made_flag~., data = test)
+
+xgboostmodel <- xgboost(data = m, label = train$shot_made_flag, nrounds = 1000, verbose = 1, objective = "binary:logistic")
+```
+```{r}
+test$pred <- predict(xgboostmodel, m2)
+test <- test %>% mutate(prediction = ifelse(pred > (1-priorProbability), 1, 0))
+test <- test %>% mutate(correct = ifelse(prediction == shot_made_flag, 1, 0))
+sum(test$correct)/nrow(test)
+```
+
