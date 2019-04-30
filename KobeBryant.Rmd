@@ -50,7 +50,8 @@ priorProbability <- sum(data$shot_made_flag)/nrow(data)
 m <- model.matrix(shot_made_flag~., data = train)
 m2 <- model.matrix(shot_made_flag~., data = test)
 
-xgboostmodel <- xgboost(data = m, label = train$shot_made_flag, nrounds = 1000, verbose = 1, objective = "binary:logistic")
+xgboostmodel <- xgboost(data = m, label = train$shot_made_flag, nrounds = 25, verbose = 1, objective = "binary:logistic")
+xgb.importance(model = xgboostmodel)
 ```
 ```{r}
 test$pred <- predict(xgboostmodel, m2)
