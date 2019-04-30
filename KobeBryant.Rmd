@@ -54,9 +54,35 @@ xgboostmodel <- xgboost(data = m, label = train$shot_made_flag, nrounds = 25, ve
 xgb.importance(model = xgboostmodel)
 ```
 ```{r}
-test$pred <- predict(xgboostmodel, m2)
-test <- test %>% mutate(prediction = ifelse(pred > (1-priorProbability), 1, 0))
-test <- test %>% mutate(correct = ifelse(prediction == shot_made_flag, 1, 0))
-sum(test$correct)/nrow(test)
+testPred <- test
+testPred$pred <- predict(xgboostmodel, m2)
+testPred <- testPred %>% mutate(prediction = ifelse(pred > (1-priorProbability), 1, 0))
+testPred <- testPred %>% mutate(correct = ifelse(prediction == shot_made_flag, 1, 0))
+sum(testPred$correct)/nrow(testPred)
 ```
 
+```{r}
+glm_fit <- glm(shot_made_flag ~ .,
+    data = train,
+    family = binomial
+)
+```
+
+```{r}
+testPred <- test
+testPred <- testPred %>% add_predictions(glm_fit) %>% mutate(prob = exp(pred)/ (1 + exp(pred)))
+
+testPred <- testPred %>% 
+    mutate(shot_made = ifelse(prob > r, 1, 0))
+testPred %>% count(shot_made_flag, shot_made) %>% spread(shot_made_flag, n)
+
+
+library(tidymodels)
+autoplot(roc_curve(testPred, as.factor(shot_made_flag), prob))
+roc_auc(testPred, as.factor(shot_made_flag), prob)
+
+# tidyverse
+
+testPred <- testPred %>% mutate(correct = ifelse(shot_made == shot_made_flag, 1, 0))
+sum(testPred$correct)/nrow(testPred)
+```
