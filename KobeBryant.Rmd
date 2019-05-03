@@ -19,6 +19,7 @@ library(modelr)
 library(caret)
 library(lubridate)
 library(tree)
+library(glmnet)
 ```
 
 ## Preparing Data
@@ -73,7 +74,7 @@ testPred <- test
 testPred <- testPred %>% add_predictions(glm_fit) %>% mutate(prob = exp(pred)/ (1 + exp(pred)))
 
 testPred <- testPred %>% 
-    mutate(shot_made = ifelse(prob > r, 1, 0))
+    mutate(shot_made = ifelse(prob > 0.5, 1, 0))
 testPred %>% count(shot_made_flag, shot_made) %>% spread(shot_made_flag, n)
 
 
@@ -84,5 +85,54 @@ roc_auc(testPred, as.factor(shot_made_flag), prob)
 # tidyverse
 
 testPred <- testPred %>% mutate(correct = ifelse(shot_made == shot_made_flag, 1, 0))
+sum(testPred$correct)/nrow(testPred)
+```
+## GENERALIZED LINEAR MODEL
+```{r}
+testPred <- test
+glmModel <- train(as.factor(shot_made_flag)~ ., train, method = 'glm', family = binomial, trControl = trainControl(method = 'cv', number = 5))
+
+testPred <- testPred%>%add_predictions(glmModel)
+
+testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
+sum(testPred$correct)/nrow(testPred)
+```
+## LINEAR DISCRIMINANT ANALYSIS
+```{r}
+testPred <- test
+ldaModel <- train(as.factor(shot_made_flag) ~ ., data=train, method="lda", trControl = trainControl(method = "cv", number = 5))
+
+testPred <- testPred%>%add_predictions(ldaModel)
+
+testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
+sum(testPred$correct)/nrow(testPred)
+```
+## XGBOOST
+```{r}
+testPred <- test
+treebagModel <- train(as.factor(shot_made_flag) ~ ., data=train, method="xgbDART", trControl = trainControl(method = "cv",number = 5))
+
+testPred <- testPred%>%add_predictions(treebagModel)
+
+testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
+sum(testPred$correct)/nrow(testPred)
+```
+## BAYES GLM
+```{r}
+testPred <- test
+treebagModel <- train(as.factor(shot_made_flag) ~ ., data=train, method="bayesglm", trControl = trainControl(method = "cv",number = 5))
+
+testPred <- testPred%>%add_predictions(treebagModel)
+
+testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
+sum(testPred$correct)/nrow(testPred)
+```
+```{r}
+testPred <- test
+treebagModel <- train(as.factor(shot_made_flag) ~ ., data=train, method="nnet", trControl = trainControl(method = "cv",number = 5))
+
+testPred <- testPred%>%add_predictions(treebagModel)
+
+testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
 sum(testPred$correct)/nrow(testPred)
 ```
