@@ -50,10 +50,17 @@ priorProbability <- sum(data$shot_made_flag)/nrow(data)
 m <- model.matrix(shot_made_flag~., data = train)
 m2 <- model.matrix(shot_made_flag~., data = test)
 
-xgboostmodel <- xgboost(data = m, label = train$shot_made_flag, nrounds = 1000, verbose = 1, objective = "binary:logistic")
+xgboostmodel <- xgb.cv(data = m, prediction = TRUE, callbacks = list(cb.cv.predict(save_models = TRUE)), label = train$shot_made_flag, nfold = 10, nrounds = 1000, verbose = 1, objective = "binary:logistic", early_stopping_rounds = 50)
 ```
 ```{r}
-test$pred <- predict(xgboostmodel, m2)
+xgboostmodel
+xgboostmodel$models
+model <- xgb.Booster.complete(xgboostmodel$models[[3]])
+```
+
+
+```{r}
+test$pred <- predict(model, m2)
 test <- test %>% mutate(prediction = ifelse(pred > (1-priorProbability), 1, 0))
 test <- test %>% mutate(correct = ifelse(prediction == shot_made_flag, 1, 0))
 sum(test$correct)/nrow(test)
