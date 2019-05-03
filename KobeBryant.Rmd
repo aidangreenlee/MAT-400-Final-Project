@@ -47,26 +47,33 @@ train <- training(resample)
 library(xgboost)
 
 priorProbability <- sum(data$shot_made_flag)/nrow(data)
-
+nfold <- 50
 m <- model.matrix(shot_made_flag~., data = train)
 m2 <- model.matrix(shot_made_flag~., data = test)
 
 
-xgboostmodel <- xgb.cv(data = m, prediction = TRUE, callbacks = list(cb.cv.predict(save_models = TRUE)), label = train$shot_made_flag, nfold = 10, nrounds = 1000, verbose = 1, objective = "binary:logistic", early_stopping_rounds = 50)
+xgboostmodel <- xgb.cv(data = m, prediction = TRUE, callbacks = list(cb.cv.predict(save_models = TRUE)), label = train$shot_made_flag, nfold = nfold, nrounds = 1000, verbose = 1, objective = "binary:logistic", early_stopping_rounds = 50)
 ```
 ```{r}
+predserr <- data.frame(numeric(nfold))
 xgboostmodel
 xgboostmodel$models
-model <- xgb.Booster.complete(xgboostmodel$models[[3]])
-```
+for(i in 1:nfold) { 
+model <- xgb.Booster.complete(xgboostmodel$models[[i]])
 
-
-```{r}
 test$pred <- predict(model, m2)
 test <- test %>% mutate(prediction = ifelse(pred > (1-priorProbability), 1, 0))
 test <- test %>% mutate(correct = ifelse(prediction == shot_made_flag, 1, 0))
-sum(test$correct)/nrow(test)
+predserr$numeric.nfold.[i] <- sum(test$correct)/nrow(test)
+}
 
+###############################################
+############## F I X  T H I S ################# <- should be which.min not which.max, but for some reason we're using classification rate
+###############################################
+n <- which.max(predserr$numeric.nfold.)
+predserr
+bestmodel <- xgb.Booster.complete(xgboostmodel$models[[n]])
+predserr$numeric.nfold.[n]
 ```
 
 ```{r}
