@@ -29,6 +29,8 @@ unique(data$shot_type)
 data <- mutate(data,time_remaining = 60*minutes_remaining + seconds_remaining)
 ggplot(data, aes(x=shot_distance, y = time_remaining,color=shot_made_flag))+geom_point()
 ggplot(data, aes(x=combined_shot_type,y = shot_made_flag)) + geom_jitter()
+ggplot(data, aes(x = lat, y = lon, color = shot_zone_area)) + geom_point() + coord_fixed(ratio = 1)# + theme(legend.position = "none")
+ggplot(data, aes(x = lat, y = lon, color = as.factor(shot_made_flag))) + geom_point() + coord_fixed(ratio = 1)# + theme(legend.position = "none")
 ```
 
 
@@ -76,6 +78,7 @@ bestmodel <- xgb.Booster.complete(xgboostmodel$models[[n]])
 predserr$numeric.nfold.[n]
 ```
 
+
 ```{r}
 glm_fit <- glm(shot_made_flag ~ .,
     data = train,
@@ -110,6 +113,7 @@ testPred <- testPred%>%add_predictions(glmModel)
 
 testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
 sum(testPred$correct)/nrow(testPred)
+
 ```
 ## LINEAR DISCRIMINANT ANALYSIS
 ```{r}
