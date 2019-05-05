@@ -33,6 +33,8 @@ ggplot(data, aes(x = lat, y = lon, color = shot_zone_area)) + geom_point() + coo
 ggplot(data, aes(x = lat, y = lon, color = as.factor(shot_made_flag))) + geom_point() + coord_fixed(ratio = 1)# + theme(legend.position = "none")
 ```
 
+Here we are cleaning the data a little, combining minutes_remaining and seconds_remaining into one variable.
+Some initial data exploration is also performed.
 
 
 ## Splitting Data
@@ -45,6 +47,10 @@ test <- testing(resample)
 train <- training(resample)
 ```
 
+The data is split into test and train sets.
+
+
+
 ```{r}
 library(xgboost)
 
@@ -52,9 +58,12 @@ priorProbability <- sum(data$shot_made_flag)/nrow(data)
 nfold <- 50
 m <- model.matrix(shot_made_flag~., data = train)
 m2 <- model.matrix(shot_made_flag~., data = test)
+```
 
+an xgboost model is used with cross validation
 
-xgboostmodel <- xgb.cv(data = m, prediction = TRUE, callbacks = list(cb.cv.predict(save_models = TRUE)), label = train$shot_made_flag, nfold = nfold, nrounds = 1000, verbose = 1, objective = "binary:logistic", early_stopping_rounds = 50)
+```{r}
+xgboostmodel <- xgb.cv(data = m, prediction = TRUE, callbacks = list(cb.cv.predict(save_models = TRUE)), label = train$shot_made_flag, nfold = nfold, nrounds = 1000, verbose = 1, objective = "binary:logistic", early_stopping_rounds = 10)
 ```
 ```{r}
 predserr <- data.frame(numeric(nfold))
@@ -66,18 +75,17 @@ model <- xgb.Booster.complete(xgboostmodel$models[[i]])
 test$pred <- predict(model, m2)
 test <- test %>% mutate(prediction = ifelse(pred > (1-priorProbability), 1, 0))
 test <- test %>% mutate(correct = ifelse(prediction == shot_made_flag, 1, 0))
-predserr$numeric.nfold.[i] <- sum(test$correct)/nrow(test)
+predserr$numeric.nfold.[i] <- 1-sum(test$correct)/nrow(test)
 }
 
-###############################################
-############## F I X  T H I S ################# <- should be which.min not which.max, but for some reason we're using classification rate
-###############################################
-n <- which.max(predserr$numeric.nfold.)
+n <- which.min(predserr$numeric.nfold.)
 predserr
 bestmodel <- xgb.Booster.complete(xgboostmodel$models[[n]])
 predserr$numeric.nfold.[n]
 ```
 
+The misclassification rate of this model is ~ 40%.
+Some more models will be tested.
 
 ```{r}
 glm_fit <- glm(shot_made_flag ~ .,
@@ -102,7 +110,7 @@ roc_auc(testPred, as.factor(shot_made_flag), prob)
 # tidyverse
 
 testPred <- testPred %>% mutate(correct = ifelse(shot_made == shot_made_flag, 1, 0))
-sum(testPred$correct)/nrow(testPred)
+1-sum(testPred$correct)/nrow(testPred)
 ```
 ## GENERALIZED LINEAR MODEL
 ```{r}
@@ -112,7 +120,7 @@ glmModel <- train(as.factor(shot_made_flag)~ ., train, method = 'glm', family = 
 testPred <- testPred%>%add_predictions(glmModel)
 
 testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
-sum(testPred$correct)/nrow(testPred)
+1-sum(testPred$correct)/nrow(testPred)
 
 ```
 ## LINEAR DISCRIMINANT ANALYSIS
@@ -123,7 +131,7 @@ ldaModel <- train(as.factor(shot_made_flag) ~ ., data=train, method="lda", trCon
 testPred <- testPred%>%add_predictions(ldaModel)
 
 testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
-sum(testPred$correct)/nrow(testPred)
+1-sum(testPred$correct)/nrow(testPred)
 ```
 ## XGBOOST
 ```{r}
@@ -133,7 +141,7 @@ treebagModel <- train(as.factor(shot_made_flag) ~ ., data=train, method="xgbDART
 testPred <- testPred%>%add_predictions(treebagModel)
 
 testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
-sum(testPred$correct)/nrow(testPred)
+1-sum(testPred$correct)/nrow(testPred)
 ```
 ## BAYES GLM
 ```{r}
@@ -143,7 +151,7 @@ treebagModel <- train(as.factor(shot_made_flag) ~ ., data=train, method="bayesgl
 testPred <- testPred%>%add_predictions(treebagModel)
 
 testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
-sum(testPred$correct)/nrow(testPred)
+1-sum(testPred$correct)/nrow(testPred)
 ```
 ```{r}
 testPred <- test
@@ -152,5 +160,23 @@ treebagModel <- train(as.factor(shot_made_flag) ~ ., data=train, method="nnet", 
 testPred <- testPred%>%add_predictions(treebagModel)
 
 testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
-sum(testPred$correct)/nrow(testPred)
+1-sum(testPred$correct)/nrow(testPred)
+```
+
+```{r}
+
+testPred <- test
+train$shot_made_flag <- as_factor(train$shot_made_flag)
+treefit <- tree(data = train, shot_made_flag ~ combined_shot_type + minutes_remaining + period + shot_type + shot_zone_area + shot_zone_basic + shot_id, method = "misclass")
+plot(treefit)
+text(treefit, all = TRUE, cex = .7)
+fittree <- cv.tree(treefit, method = "misclass")
+plot(fittree$size, fittree$dev, type = "b")
+
+prune_fit <- prune.misclass(treefit, best = 3)
+plot(prune_fit, type = "uniform")
+text(prune_fit, all = TRUE, cex = .7)
+
+testPred %>% modelr::add_predictions(prune_fit, type = "class") %>%
+    accuracy(as.factor(shot_made_flag), pred)
 ```
