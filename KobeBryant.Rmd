@@ -165,12 +165,15 @@ testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
 ```
 
 ```{r}
-
 testPred <- test
 train$shot_made_flag <- as_factor(train$shot_made_flag)
-treefit <- tree(data = train, shot_made_flag ~ combined_shot_type + minutes_remaining + period + shot_type + shot_zone_area + shot_zone_basic + shot_id, method = "misclass")
+treefit <- tree(data = train, shot_made_flag ~ .  -opponent, method = "misclass")
 plot(treefit)
 text(treefit, all = TRUE, cex = .7)
+```
+
+
+```{r}
 fittree <- cv.tree(treefit, method = "misclass")
 plot(fittree$size, fittree$dev, type = "b")
 
