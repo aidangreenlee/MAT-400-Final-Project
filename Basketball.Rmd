@@ -78,14 +78,6 @@ svmfit
 test$svmfit <- predict(svmfit, test)
 svmfit$index
 ```
-```{r}
-tune_out <- tune(svm, SHOT_RESULT ~ ., data = train1, kernel = "linear",
-                 ranges = list(cost = c(0.001, 0.01, 0.1, 1, 5, 10, 100)))
-summary(tune_out)
-bestmod <- tune_out$best.model
-summary(bestmod)
-```
-
 
 ## MSEs and Predictions
 ```{r mse, echo=FALSE}
