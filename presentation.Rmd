@@ -1,12 +1,22 @@
 ---
+<<<<<<< HEAD
 title: "Prediction of NBA Shots"
+=======
+title: "Final Project"
+subtitle: NBA data
+>>>>>>> 9ee91d2a6049dbf13a2e3ad3f19fff59615a013f
 author: Aidan and Liam Greenlee
 output:
   slidy_presentation: default
   beamer_presentation: default
 ---
 
+<<<<<<< HEAD
 ## Data
+=======
+## R Markdown
+
+>>>>>>> 9ee91d2a6049dbf13a2e3ad3f19fff59615a013f
 ```{r markdown, include=FALSE}
 library(tidyverse)
 require(gridExtra)
@@ -19,6 +29,7 @@ library(lubridate)
 library(tree)
 library(glmnet)
 ```
+<<<<<<< HEAD
 * The data contains the information on shots during the 2014-2015 season.
   * Player who took the shot
   * Who was the closest defender
@@ -47,6 +58,24 @@ cutoff <- 1-priorProbability
 ```
 
 
+=======
+
+## Preparing Data
+
+```{r prep, echo=FALSE}
+data1 <- na.omit(read.csv(file = "shot_logs.csv"))
+#unique <- unique(data1$player_name)
+#filter(data1, player_name == "brian roberts")
+#plot1 <- ggplot(data1,mapping = aes(x=SHOT_DIST,y=CLOSE_DEF_DIST,color = SHOT_RESULT)) + geom_point()
+#plot2 <- ggplot(data1,mapping = aes(x=SHOT_DIST,y=CLOSE_DEF_DIST,color = PTS_TYPE)) + geom_point()
+#grid.arrange(plot1, plot2, ncol=2)
+data1$GAME_CLOCK<- as.double(ms(data1$GAME_CLOCK))
+data1 <- data1 %>% mutate(SHOT_RESULT = ifelse(SHOT_RESULT == "made", 1, 0))
+#data <- data.frame(data1$LOCATION, data1$W, data1$FINAL_MARGIN, data1$SHOT_NUMBER, data1$PERIOD, data1$GAME_CLOCK, data1$SHOT_CLOCK, data1$DRIBBLES, data1$TOUCH_TIME, data1$SHOT_DIST, data1$PTS_TYPE, data1$CLOSEST_DEFENDER_PLAYER_ID, data1$CLOSE_DEF_DIST, data1$player_id, GAME_ID)
+data <- data1[,c(1,3,4,5,6,7,8,9,10,11,12,13,14,16,17,21)]
+data$GAME_CLOCK_TOT <- data$GAME_CLOCK+(data$PERIOD-1)*720
+```
+>>>>>>> 9ee91d2a6049dbf13a2e3ad3f19fff59615a013f
 ## Splitting Data
 
 ```{r split, results='hide'}
@@ -58,16 +87,21 @@ split <- resample_partition(train, c(train1 = .1, train2 = .9))
 train1 <- as_tibble(split$train1)
 train2 <- as_tibble(split$train2)
 train1
+<<<<<<< HEAD
 data
 ```
 * full data set has 122,502 rows
 * 70% training set still has 85,752 rows
 * cut training set down to 8,575 rows
+=======
+```
+>>>>>>> 9ee91d2a6049dbf13a2e3ad3f19fff59615a013f
 
 ## Graph
 
 ```{r graph, echo=FALSE}
 plot(x = train1$GAME_CLOCK, y = train1$PERIOD)
+<<<<<<< HEAD
 plot(x = train1$GAME_CLOCK_TOT, y = train1$PERIOD)
 ```
 
@@ -90,12 +124,23 @@ ggplot(data)+geom_point(mapping = aes(x = CLOSE_DEF_DIST,y = SHOT_DIST,color = S
 ## Fit Data (Elastic Net)
 
 ```{r, echo = FALSE}
+=======
+```
+
+## Fit Data
+
+```{r}
+>>>>>>> 9ee91d2a6049dbf13a2e3ad3f19fff59615a013f
 x <- model.matrix(SHOT_RESULT ~ ., train)
 y <- train$SHOT_RESULT
 nfolds <- 40
 foldid <- sample(1:nfolds, length(y), replace = TRUE)
 do_cv <- function(alpha) {
+<<<<<<< HEAD
   result <- cv.glmnet(x, y, alpha = alpha, nfolds = nfolds, foldid = foldid, family = "binomial")
+=======
+  result <- cv.glmnet(x, y, alpha = alpha, nfolds = nfolds, foldid = foldid)
+>>>>>>> 9ee91d2a6049dbf13a2e3ad3f19fff59615a013f
   tibble(alpha = alpha, lambda = result$lambda.min, cv = min(result$cvm))
 }
 g <- seq(0, 1, 0.1) %>% map_dfr(do_cv) %>% mutate(rank = row_number(cv))
@@ -103,11 +148,16 @@ g
 alpha <- grep("^1$", g$rank)*.1-.1
 lambdamin <- g$lambda[which.min(g$cv)]
 #lambdamin <- cv.glmnet(x, y, alpha = alpha, nfolds = nfolds)$lambda.min
+<<<<<<< HEAD
 elasticnet <- glmnet(x, y, alpha = alpha, lambda = lambdamin, family = "binomial")
+=======
+elasticnet <- glmnet(x, y, alpha = alpha, lambda = lambdamin)
+>>>>>>> 9ee91d2a6049dbf13a2e3ad3f19fff59615a013f
 vars <- elasticnet$beta %>% as.matrix() %>% as_tibble(rownames = "variable")
 arrange(vars, desc((vars$s0)^2))
 ```
 
+<<<<<<< HEAD
 ## Choosing Lambda With Elastic Net
 ```{r, echo = FALSE}
 enet <- glmnet(x, y, alpha = alpha, family = "binomial")
@@ -129,6 +179,22 @@ enetmse
 ```
 
 ```{r fit, include=FALSE}
+=======
+```{r}
+enet <- glmnet(x, y, alpha = alpha)
+plot(enet, xvar= "lambda")
+```
+```{r}
+elasticnet
+enetpred <- as_tibble(predict(elasticnet, newx=model.matrix(SHOT_RESULT ~ ., data = test)))
+enetpred
+enetpred <- enetpred %>% mutate(s0 = ifelse(s0 >= .5, 1, 0))
+enetpred
+```
+
+
+```{r fit, echo=FALSE}
+>>>>>>> 9ee91d2a6049dbf13a2e3ad3f19fff59615a013f
 svmfit <- svm(SHOT_RESULT ~ LOCATION + W + FINAL_MARGIN + SHOT_NUMBER + PERIOD + GAME_CLOCK + SHOT_CLOCK + DRIBBLES + TOUCH_TIME + SHOT_DIST + PTS_TYPE + CLOSEST_DEFENDER_PLAYER_ID + CLOSE_DEF_DIST + player_id + GAME_ID + GAME_CLOCK_TOT, data = train1, kernel = "radial", cost = 10, gamma = 1)
 
 lmfit <- lm( data = train1, SHOT_RESULT ~ LOCATION + W + FINAL_MARGIN + SHOT_NUMBER + PERIOD + GAME_CLOCK + SHOT_CLOCK + DRIBBLES + TOUCH_TIME + SHOT_DIST + PTS_TYPE + CLOSEST_DEFENDER_PLAYER_ID + CLOSE_DEF_DIST + player_id + GAME_ID + GAME_CLOCK_TOT)
@@ -137,6 +203,7 @@ treefit <- tree( data = train1, formula = SHOT_RESULT ~ LOCATION + W + FINAL_MAR
 cvtree <- cv.tree(treefit, FUN = prune.tree, K = 10)
 ```
 
+<<<<<<< HEAD
 ```{r , include=FALSE}
 svmfit
 test$svmfit <- predict(svmfit, test)
@@ -217,3 +284,29 @@ Tree and Linear Model MSEs:
 * Use position data 
 * Shot type
 * Pull more data on the shot zone
+=======
+```{r}
+svmfit
+test$svmfit <- predict(svmfit, test)
+test$lmfit <- predict(lmfit, test)
+cvtree
+```
+## MSEs and Predictions
+
+```{r mse, echo=FALSE}
+library(caret)
+varImp(lmfit)
+treefit
+plot(treefit)
+text(treefit, pretty = 1, all = TRUE)
+test$treefit <- predict(treefit, test)
+test <- test %>% mutate(treefit = ifelse(treefit >= .5, 1, 0))
+test <- test %>% mutate(lmfit = ifelse(lmfit >= .5, 1, 0))
+test <- test %>% mutate(svmfit = ifelse(svmfit >= .5, 1, 0))
+cat("after\n")
+mean((test$treefit - test$SHOT_RESULT)^2)
+mean((test$lmfit - test$SHOT_RESULT)^2)
+mean((test$svmfit - test$SHOT_RESULT)^2)
+```
+
+>>>>>>> 9ee91d2a6049dbf13a2e3ad3f19fff59615a013f
