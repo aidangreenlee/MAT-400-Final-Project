@@ -37,15 +37,6 @@ data
 priorProbability <- sum(data1$SHOT_RESULT)/nrow(data1)
 
 ```
-```{r}
-cutoff <- 1-priorProbability
-test2 <- add_predictions(test,glm_fit,var="pred")
-test2$prob = exp(test2$pred)/ (1 + exp(test2$pred))
-
-test2 <- test2 %>% mutate(estimate = ifelse(prob> cutoff, 1, 0)) %>% mutate(correct = ifelse(SHOT_RESULT == estimate,1,0))
-
-(1-(sum(test2$correct)/nrow(test2)))
-```
 ## Splitting Data
 ```{r split, results='hide'}
 data$SHOT_RESULT <- as_factor(data$SHOT_RESULT)
@@ -120,4 +111,14 @@ train <- train %>%
 
 autoplot(roc_curve(train, as.factor(SHOT_RESULT), prob))
 roc_auc(train, as.factor(SHOT_RESULT), prob)
+```
+
+```{r}
+cutoff <- 1-priorProbability
+test2 <- add_predictions(test,glm_fit,var="pred")
+test2$prob = exp(test2$pred)/ (1 + exp(test2$pred))
+
+test2 <- test2 %>% mutate(estimate = ifelse(prob> cutoff, 1, 0)) %>% mutate(correct = ifelse(SHOT_RESULT == estimate,1,0))
+
+(1-(sum(test2$correct)/nrow(test2)))
 ```
