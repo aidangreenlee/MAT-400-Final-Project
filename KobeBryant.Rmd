@@ -17,7 +17,7 @@ library(tree)
 library(glmnet)
 ```
 
-## Data Exploration
+## DATA EXPLORATION
 ```{r prep}
 data <- na.omit(read.csv(file = "data.csv"))
 data <- mutate(data,time_remaining = 60*minutes_remaining + seconds_remaining)
@@ -47,7 +47,7 @@ ggplot(data, aes(x=loc_x,y=loc_y, color = shot_distance)) + geom_point() + coord
 
 The exploration indicates thate the best predictors could be shot distance, combined shot type, and maybe shot zone area.
 
-## Splitting Data
+## SPLITTING DATA
 ```{r split, results='hide'}
 
 #data$shot_made_flag <- as.factor(data$shot_made_flag)
@@ -90,7 +90,8 @@ xgboostmodel
 xgboostmodel$models
 ```
 
-Here, we are performing cross validation on xgboost to choose the best model.
+Here, we are performing 10 fold cross validation on xgboost to choose the best model.
+
 ```{r}
 for(i in 1:nfold) { 
 model <- xgb.Booster.complete(xgboostmodel$models[[i]])
@@ -108,8 +109,10 @@ predserr$numeric.nfold.[n]
 ```
 
 The misclassification rate of this model is ~ 40%.
-Some more models will be tested.
+Some more models will be tested to achieve a lower misclassification rate.
 
+## LOGISTIC REGRESSION
+We decided to try logistic regression next.
 ```{r}
 glm_fit <- glm(shot_made_flag ~ .,
     data = train,
@@ -123,8 +126,6 @@ testPred <- testPred %>% add_predictions(glm_fit) %>% mutate(prob = exp(pred)/ (
 
 testPred <- testPred %>% 
     mutate(shot_made = ifelse(prob > 0.5, 1, 0))
-testPred %>% count(shot_made_flag, shot_made) %>% spread(shot_made_flag, n)
-
 
 library(tidymodels)
 autoplot(roc_curve(testPred, as.factor(shot_made_flag), prob))
@@ -135,18 +136,10 @@ roc_auc(testPred, as.factor(shot_made_flag), prob)
 testPred <- testPred %>% mutate(correct = ifelse(shot_made == shot_made_flag, 1, 0))
 1-sum(testPred$correct)/nrow(testPred)
 ```
-## GENERALIZED LINEAR MODEL
-```{r}
-testPred <- test
-glmModel <- train(as.factor(shot_made_flag)~ ., train, method = 'glm', family = binomial, trControl = trainControl(method = 'cv', number = 5))
+This model performed roughly the same as the xgboost model as shown by the ROC curve and the misclassification rate.
 
-testPred <- testPred%>%add_predictions(glmModel)
-
-testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
-1-sum(testPred$correct)/nrow(testPred)
-
-```
 ## LINEAR DISCRIMINANT ANALYSIS
+We discovered the package caret to train data using a bunch of different models, so we decide to try a few out, starting with LDA.
 ```{r}
 testPred <- test
 ldaModel <- train(as.factor(shot_made_flag) ~ ., data=train, method="lda", trControl = trainControl(method = "cv", number = 5))
@@ -156,59 +149,49 @@ testPred <- testPred%>%add_predictions(ldaModel)
 testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
 1-sum(testPred$correct)/nrow(testPred)
 ```
-## XGBOOST
-```{r}
-library(xgboost)
-
-priorProbability <- sum(data$shot_made_flag)/nrow(data)
-nfold <- 50
-m <- model.matrix(shot_made_flag~., data = train)
-m2 <- model.matrix(shot_made_flag~., data = test)
-```
-
-an xgboost model is used with cross validation
-
-```{r}
-xgboostmodel <- xgb.cv(data = m, prediction = TRUE, callbacks = list(cb.cv.predict(save_models = TRUE)), label = train$shot_made_flag, nfold = nfold, nrounds = 1000, verbose = 1, objective = "binary:logistic", early_stopping_rounds = 10)
-```
-```{r}
-predserr <- data.frame(numeric(nfold))
-xgboostmodel
-xgboostmodel$models
-for(i in 1:nfold) { 
-model <- xgb.Booster.complete(xgboostmodel$models[[i]])
-
-test$pred <- predict(model, m2)
-test <- test %>% mutate(prediction = ifelse(pred > (1-priorProbability), 1, 0))
-test <- test %>% mutate(correct = ifelse(prediction == shot_made_flag, 1, 0))
-predserr$numeric.nfold.[i] <- 1-sum(test$correct)/nrow(test)
-}
-
-n <- which.min(predserr$numeric.nfold.)
-predserr
-bestmodel <- xgb.Booster.complete(xgboostmodel$models[[n]])
-predserr$numeric.nfold.[n]
-```
 ## BAYES GLM
+Next we decided to use Bayes GLM from caret.
 ```{r}
 testPred <- test
-treebagModel <- train(as.factor(shot_made_flag) ~ ., data=train, method="bayesglm", trControl = trainControl(method = "cv",number = 5))
+bayesmod <- train(as.factor(shot_made_flag) ~ ., data=train, method="bayesglm", trControl = trainControl(method = "cv",number = 5))
 
-testPred <- testPred%>%add_predictions(treebagModel)
+testPred <- testPred%>%add_predictions(bayesmod)
 
 testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
 1-sum(testPred$correct)/nrow(testPred)
 ```
-```{r}
+## NNET
+We also decided to a neural network model from caret
+```{r, results = 'hide'}
 testPred <- test
-treebagModel <- train(as.factor(shot_made_flag) ~ ., data=train, method="nnet", trControl = trainControl(method = "cv",number = 5))
+nnetmod <- train(as.factor(shot_made_flag) ~ ., data=train, method="nnet", trControl = trainControl(method = "cv",number = 5))
+```
 
-testPred <- testPred%>%add_predictions(treebagModel)
+
+```{r}
+testPred <- testPred%>%add_predictions(nnetmod)
 
 testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
 1-sum(testPred$correct)/nrow(testPred)
 ```
 
+## EARTH
+Finally, we decided to use earth from caret.
+```{r}
+testPred <- test
+earthmod <- train(as.factor(shot_made_flag) ~ ., data=train, method="earth", trControl = trainControl(method = "cv",number = 5))
+
+testPred <- testPred%>%add_predictions(earthmod)
+
+testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
+1-sum(testPred$correct)/nrow(testPred)
+```
+
+We found that using all of these led to similar results, around a 39% misclassification rate
+
+
+## TREE
+We tried a tree model
 ```{r}
 testPred <- test
 train$shot_made_flag <- as_factor(train$shot_made_flag)
@@ -216,12 +199,15 @@ treefit <- tree(data = train, shot_made_flag ~ .  -opponent, method = "misclass"
 plot(treefit)
 text(treefit, all = TRUE, cex = .7)
 ```
-
+This plot shows the tree. There are not many nodes, which we thought was unusual.
 
 ```{r}
 fittree <- cv.tree(treefit, method = "misclass")
 plot(fittree$size, fittree$dev, type = "b")
+```
 
+This graph shows the best size for the tree, which is used for the pruning.
+```{r}
 prune_fit <- prune.misclass(treefit, best = 3)
 plot(prune_fit, type = "uniform")
 text(prune_fit, all = TRUE, cex = .7)
@@ -229,3 +215,5 @@ text(prune_fit, all = TRUE, cex = .7)
 testPred %>% modelr::add_predictions(prune_fit, type = "class") %>%
     accuracy(as.factor(shot_made_flag), pred)
 ```
+The pruned tree looks the same as the original fit.
+The tree model yields a similar misclassification rate to other models.

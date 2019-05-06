@@ -1,11 +1,9 @@
 ---
-title: "Final Project"
-subtitle: NBA data
+title: "MAT 400 Final Project"
+subtitle: NBA Shot Prediction
 author: Aidan and Liam Greenlee
 
 ---
-
-## R Markdown
 
 ```{r markdown, include=FALSE}
 library(tidyverse)
@@ -19,8 +17,8 @@ library(lubridate)
 library(tree)
 ```
 
-## Preparing Data
-```{r prep, echo=FALSE}
+## PREPARING DATA
+```{r prep, results = 'hide'}
 data1 <- na.omit(read.csv(file = "shot_logs.csv"))
 #unique <- unique(data1$player_name)
 #filter(data1, player_name == "brian roberts")
@@ -37,7 +35,10 @@ data
 priorProbability <- sum(data1$SHOT_RESULT)/nrow(data1)
 
 ```
-## Splitting Data
+The data was made easier to interpret, such as converting HH:MM:SS to just seconds and the most relevant columns were selected.
+Columns such as player id, game id, and closest defender name were removed.
+
+## SPLITTING DATA
 ```{r split, results='hide'}
 data$SHOT_RESULT <- as_factor(data$SHOT_RESULT)
 
@@ -49,15 +50,18 @@ train1 <- as_tibble(split$train1)
 train2 <- as_tibble(split$train2)
 train1
 ```
+We split the data into training and testing sets.
+We also made a train1 set to make testing our code faster.
 ## Graph
-```{r graph, echo=FALSE}
+```{r graph, include=FALSE}
 plot(x = train1$GAME_CLOCK, y = train1$PERIOD)
 ```
 
 
 
 ## Fit Data
-```{r fit, echo=FALSE}
+We tried an svm and a tree model.
+```{r fit}
 
 svmfit <- svm(SHOT_RESULT ~ ., data = train1, kernel = "linear", cost = .001, scale = FALSE)
 
@@ -74,7 +78,6 @@ text(prune_fit, all = TRUE, cex = .7)
 ```{r}
 svmfit
 test$svmfit <- predict(svmfit, test)
-svmfit$index
 ```
 
 ## MSEs and Predictions
@@ -89,11 +92,13 @@ predict <- test %>% modelr::add_predictions(prune_fit, type = "class")# %>% accu
 #test <- test %>% mutate(svmfit = ifelse(svmfit >= .5, 1, 0))
 predict <- predict %>% mutate(correct = ifelse(pred == SHOT_RESULT, 1, 0))
 test <- test %>% mutate(svmcorrect = ifelse(svmfit == SHOT_RESULT,1, 0))
-cat("after\n")
+cat("svm misclassification rate:")
 1-sum(as.numeric(as.character(test$svmcorrect)))/nrow(test)
+cat("tree misclassification rate:")
 1-sum(as.numeric(as.character(predict$correct)))/nrow(predict)
 ```
 ## LOGISTIC REGRESSION
+We tried a logistic regression as well.
 ```{r}
 glm_fit <- glm(SHOT_RESULT ~ .,
     data = train,
@@ -102,9 +107,12 @@ glm_fit <- glm(SHOT_RESULT ~ .,
 glm_fit
 ```
 
-```{r}
+```{r, results='hide'}
 test %>% add_predictions(glm_fit) %>% mutate(prob = exp(pred)/ (1 + exp(pred)))
+```
 
+
+```{r}
 train <- train %>% 
     add_predictions(glm_fit) %>% 
     mutate(prob = exp(pred)/ (1 + exp(pred)), EstResult = ifelse(prob > 1 - priorProbability, 1, 0))
@@ -112,7 +120,7 @@ train <- train %>%
 autoplot(roc_curve(train, as.factor(SHOT_RESULT), prob))
 roc_auc(train, as.factor(SHOT_RESULT), prob)
 ```
-
+This is the ROC curve for this model.
 ```{r}
 cutoff <- 1-priorProbability
 test2 <- add_predictions(test,glm_fit,var="pred")
@@ -122,3 +130,4 @@ test2 <- test2 %>% mutate(estimate = ifelse(prob> cutoff, 1, 0)) %>% mutate(corr
 
 (1-(sum(test2$correct)/nrow(test2)))
 ```
+This regression led to a similar, yet slightly better misclassification rate.
