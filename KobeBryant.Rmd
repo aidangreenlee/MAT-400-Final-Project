@@ -1,10 +1,7 @@
 ---
 title: "Final Project"
+author: "Aidan and Liam Greenlee"
 subtitle: NBA data
-author: Aidan and Liam Greenlee
-output:
-  slidy_presentation: default
-  beamer_presentation: default
 ---
 
 ## R Markdown
