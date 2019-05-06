@@ -1,10 +1,8 @@
 ---
-title: "Final Project"
+title: "MAT 400 Final Project"
 author: "Aidan and Liam Greenlee"
-subtitle: NBA data
+subtitle: NBA Shot Prediction
 ---
-
-## R Markdown
 
 ```{r markdown, include=FALSE}
 library(tidyverse)
@@ -19,21 +17,35 @@ library(tree)
 library(glmnet)
 ```
 
-## Preparing Data
-```{r prep, echo=FALSE}
+## Data Exploration
+```{r prep}
 data <- na.omit(read.csv(file = "data.csv"))
-unique(data$shot_type)
 data <- mutate(data,time_remaining = 60*minutes_remaining + seconds_remaining)
-ggplot(data, aes(x=shot_distance, y = time_remaining,color=shot_made_flag))+geom_point()
-ggplot(data, aes(x=combined_shot_type,y = shot_made_flag)) + geom_jitter()
+```
+Here we are cleaning the data a little, combining minutes_remaining and seconds_remaining into one variable as well as omitting NA values.
+
+```{r prep}
+ggplot(data, aes(x=shot_distance, y = time_remaining,color=as_factor(shot_made_flag)))+geom_point()
+```
+It seems like shot_distance is related to shot_made_flag
+
+```{r prep, echo=FALSE}
+ggplot(data, aes(x=combined_shot_type,y = as_factor(shot_made_flag))) + geom_jitter()
+```
+This jitter plot shows that some shot types can be used t determine if the shot was made or missed. (dunks are usually made)
+
+```{r prep, echo=FALSE}
 ggplot(data, aes(x = lat, y = lon, color = shot_zone_area)) + geom_point() + coord_fixed(ratio = 1)# + theme(legend.position = "none")
+
 ggplot(data, aes(x = lat, y = lon, color = as.factor(shot_made_flag))) + geom_point() + coord_fixed(ratio = 1)# + theme(legend.position = "none")
+```
+It seems like shots from the back of the court are almost always missed. This is could be a good predictor
+
+```{r prep, echo=FALSE}
 ggplot(data, aes(x=loc_x,y=loc_y, color = shot_distance)) + geom_point() + coord_fixed(ratio = 1) + scale_colour_gradientn(colours=rainbow(100))
 ```
 
-Here we are cleaning the data a little, combining minutes_remaining and seconds_remaining into one variable.
-Some initial data exploration is also performed.
-
+The exploration indicates thate the best predictors could be shot distance, combined shot type, and maybe shot zone area.
 
 ## Splitting Data
 ```{r split, results='hide'}
@@ -46,27 +58,40 @@ train <- training(resample)
 ```
 
 The data is split into test and train sets.
+We omitted some columns that include information from other columns or were not important (game id, shot id, etc.)
 
-
-
-```{r}
+## XGBOOST
+```{r, echo=FALSE}
 library(xgboost)
 
 priorProbability <- sum(data$shot_made_flag)/nrow(data)
-nfold <- 50
+```
+
+
+```{r}
+nfold <- 10
 m <- model.matrix(shot_made_flag~., data = train)
 m2 <- model.matrix(shot_made_flag~., data = test)
 ```
 
-an xgboost model is used with cross validation
+An xgboost model is used with 10 fold cross validation.
 
 ```{r}
 xgboostmodel <- xgb.cv(data = m, prediction = TRUE, callbacks = list(cb.cv.predict(save_models = TRUE)), label = train$shot_made_flag, nfold = nfold, nrounds = 1000, verbose = 1, objective = "binary:logistic", early_stopping_rounds = 10)
 ```
+
 ```{r}
 predserr <- data.frame(numeric(nfold))
 xgboostmodel
+```
+
+
+```{r, include=FALSE}
 xgboostmodel$models
+```
+
+Here, we are performing cross validation on xgboost to choose the best model.
+```{r}
 for(i in 1:nfold) { 
 model <- xgb.Booster.complete(xgboostmodel$models[[i]])
 
