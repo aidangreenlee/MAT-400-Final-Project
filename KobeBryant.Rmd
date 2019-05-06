@@ -136,13 +136,36 @@ testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
 ```
 ## XGBOOST
 ```{r}
-testPred <- test
-treebagModel <- train(as.factor(shot_made_flag) ~ ., data=train, method="xgbDART", trControl = trainControl(method = "cv",number = 5))
+library(xgboost)
 
-testPred <- testPred%>%add_predictions(treebagModel)
+priorProbability <- sum(data$shot_made_flag)/nrow(data)
+nfold <- 50
+m <- model.matrix(shot_made_flag~., data = train)
+m2 <- model.matrix(shot_made_flag~., data = test)
+```
 
-testPred <- testPred %>% mutate(correct = ifelse(pred == shot_made_flag, 1, 0))
-1-sum(testPred$correct)/nrow(testPred)
+an xgboost model is used with cross validation
+
+```{r}
+xgboostmodel <- xgb.cv(data = m, prediction = TRUE, callbacks = list(cb.cv.predict(save_models = TRUE)), label = train$shot_made_flag, nfold = nfold, nrounds = 1000, verbose = 1, objective = "binary:logistic", early_stopping_rounds = 10)
+```
+```{r}
+predserr <- data.frame(numeric(nfold))
+xgboostmodel
+xgboostmodel$models
+for(i in 1:nfold) { 
+model <- xgb.Booster.complete(xgboostmodel$models[[i]])
+
+test$pred <- predict(model, m2)
+test <- test %>% mutate(prediction = ifelse(pred > (1-priorProbability), 1, 0))
+test <- test %>% mutate(correct = ifelse(prediction == shot_made_flag, 1, 0))
+predserr$numeric.nfold.[i] <- 1-sum(test$correct)/nrow(test)
+}
+
+n <- which.min(predserr$numeric.nfold.)
+predserr
+bestmodel <- xgb.Booster.complete(xgboostmodel$models[[n]])
+predserr$numeric.nfold.[n]
 ```
 ## BAYES GLM
 ```{r}
