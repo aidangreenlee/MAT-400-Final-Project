@@ -122,5 +122,4 @@ train <- train %>%
 
 autoplot(roc_curve(train, as.factor(SHOT_RESULT), prob))
 roc_auc(train, as.factor(SHOT_RESULT), prob)
-mse(glm_fit,test)
 ```
